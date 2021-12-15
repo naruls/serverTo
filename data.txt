@@ -1,1 +1,1 @@
-{"tempEnd":"268.92"}{"windEnd":"2.19"}
+{"tempEnd":"258.25","lonEnd":"30.2628","latEnd":"60.1089"}{"windEnd":"3.31"}

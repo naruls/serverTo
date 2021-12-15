@@ -5,61 +5,42 @@ import cors from 'cors';
 import _ from 'lodash'; /*необходимая для merge библиотека*/
 import fs from 'fs';
 
-var objDataTo = {};
-var objEndOp = {};
-var objEndData = {};
-
 const app = express();
 
-var corsOptions = {
-    origin: 'http://localhost:3000',
-    optionsSuccessStatus: 200,
-    methods: "GET",
-}
+const options = {
+  origin: [
+    'http://localhost:3000',
+  ],
+  methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE'],
+  preflightContinue: false,
+  optionsSuccessStatus: 200,
+  allowedHeaders: ['Content-Type', 'origin', 'Authorization', 'Accept'],
+  credentials: true,
+};
 
 const client = new pg.Client({
     user: 'postgres',
-    host: 'localhost',
-    database: 'wether_test',
-    password: '77889912',
+    host: '172.16.117.193',
+    database: 'Wether_test',
+    password: '1234',
     port: 5432,
 });
 
 client.connect();
 
-app.use(cors(corsOptions));
+app.use(cors(options));
 
-const { PORT = 3000 } = process.env;
+const { PORT = 3002 } = process.env;
 
-const osinovaiRosFirsPointTomorrow = "https://api.tomorrow.io/v4/timelines?location=60.108884,30.262840&fields=temperature,precipitationIntensity,precipitationType,windSpeed,windGust,windDirection,temperatureApparent&timesteps=current&units=metric&timezone=Europe/Moscow&apikey=sCUblc1wePiFH49ZtaUla6zoB0N62pCv";
-const osinovaiRosFirsPointOpenweter = "https://api.openweathermap.org/data/2.5/weather?lat=60.108884&lon=30.262840&lang=fr&appid=6264921aac158477ee4f86c2486e4f38";
+const cordHibin = {
+  lat: 67.670036,
+  lon: 33.687525,
+};
+
+const osinovaiRosFirsPointTomorrow = "https://api.tomorrow.io/v4/timelines?location=67.670036,33.687525&fields=temperature,windSpeed,windGust,windDirection,pressureSeaLevel,humidity&timesteps=current&units=metric&timezone=Europe/Moscow&apikey=sCUblc1wePiFH49ZtaUla6zoB0N62pCv";
 
 
 app.use(express.json());
-
-function fetchDataOpenweathermap(link){
-  fetch(link)
-    .then(res => res.json())
-    .then(json => {
-        console.log(json);
-        const query = `
-          INSERT INTO openwether (temp, wind)
-          VALUES ($1, $2) returning *
-        `;
-        client.query(query, [json.main.temp, json.wind.speed], (err, res) => {
-          if (err) {
-            console.error(err);
-            return;
-          }
-          console.log('Data insert successful');
-        });
-      })
-      .catch(err =>{
-        console.log(err);
-      })
-
-}
-
 
 function fetchDataTomorroyApi(link) {
   fetch(link)
@@ -67,10 +48,13 @@ function fetchDataTomorroyApi(link) {
     .then(json => {
         console.log(json.data.timelines[0].intervals[0].values);
         const query = `
-          INSERT INTO tomorrowapi (temp, wind)
-          VALUES ($1, $2) returning *
+          INSERT INTO in_tomorrowapi (temperature, humidity, pressure, windSpeed, windDirection, windGust, time)
+          VALUES ($1, $2, $3, $4, $5, $6, $7) returning *
         `;
-        client.query(query, [json.data.timelines[0].intervals[0].values.temperature, json.data.timelines[0].intervals[0].values.windSpeed], (err, res) => {
+        client.query(query, [json.data.timelines[0].intervals[0].values.temperature, json.data.timelines[0].intervals[0].values.humidity,
+          json.data.timelines[0].intervals[0].values.pressureSeaLevel, json.data.timelines[0].intervals[0].values.windSpeed,
+          json.data.timelines[0].intervals[0].values.windDirection, json.data.timelines[0].intervals[0].values.windGust,
+          json.data.timelines[0].intervals[0].startTime], (err, res) => {
           if (err) {
             console.error(err);
             return;
@@ -84,71 +68,13 @@ function fetchDataTomorroyApi(link) {
 
 }
 
-function script(){
-  const query = `
-  SELECT temp,wind FROM openwether WHERE id=(select max(id) from openwether)
-`;
-  client.query(query, (err, res) => {
-    if (err) {
-        console.error(err);
-        return;
-    }
-    objDataTo = { tempEnd: res.rows[0].temp};
-    console.log(res.rows[0].temp);
-    fs.writeFile('data.txt', JSON.stringify({tempEnd: res.rows[0].temp}), (err) => {
-        if(err) throw err;
-        console.log('Data has been replaced!');
-    });
-  });
-  const query2 = `
-  SELECT temp,wind FROM tomorrowapi WHERE id=(select max(id) from tomorrowapi)
-`;
-  client.query(query2, (err, res) => {
-    if (err) {
-        console.error(err);
-        return;
-    }
-    objEndOp = { windEnd: res.rows[0].wind };
-    console.log(res.rows[0].wind);
-    fs.appendFile('data.txt', JSON.stringify({windEnd: res.rows[0].wind}), (err) => {
-        if(err) throw err;
-        console.log('Data has been replaced!');
-    });
-  });
-  var objResult = _.merge(objEndOp, objDataTo);
-  objEndData = objResult;
-  console.log(objEndData);
-}
-
-
-function endFuction(linkOpen, linkTomorrow) {
-  fetchDataOpenweathermap(linkOpen);
+function endFuction(linkTomorrow) {
   fetchDataTomorroyApi(linkTomorrow);
-
-  script();
-  var textData = fs.readFileSync('data.txt','utf8');
-
-  /*const query3 = `
-    INSERT INTO endData (tempend, windend)
-    VALUES ($1, $2) returning *
-    `;
-  client.query(query3, [kl.temp, op.wind], (err, res) => {
-    if (err) {
-        console.error(err);
-        return;
-    }
-      console.log('Data insert successful');
-  });*/
 }
 
 
-let timerId = setInterval(() => endFuction(osinovaiRosFirsPointOpenweter, osinovaiRosFirsPointTomorrow), 10000);
+let timerId = setInterval(() => endFuction(osinovaiRosFirsPointTomorrow), 600000);
 
-
-
-app.get('/objEndData', (request, response) => {
-    response.send(objEndData);
-});
 
 app.listen(PORT, () => {
   console.log(`App listening on port ${PORT}`);
