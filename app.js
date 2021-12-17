@@ -4,7 +4,9 @@ import fetch from 'node-fetch';
 import cors from 'cors';
 import _ from 'lodash'; /*необходимая для merge библиотека*/
 import fs from 'fs';
+import queryString  from 'query-string';
 import moment from 'moment';
+import momentZone from 'moment-timezone';
 
 const app = express();
 
@@ -37,6 +39,12 @@ const cordHibin = {
   lat: 67.670036,
   lon: 33.687525,
 };
+
+
+app.use(express.json());
+
+function fetchDataTomorroyApi() {
+
 
 const getTimelineURL = "https://api.tomorrow.io/v4/timelines";
 
@@ -89,12 +97,11 @@ const getTimelineParameters =  queryString.stringify({
 }, {arrayFormat: "comma"});
 
 
-app.use(express.json());
 
-function fetchDataTomorroyApi() {
   fetch(getTimelineURL + "?" + getTimelineParameters)
     .then(res => res.json())
     .then(json => {
+        let currentTime = momentZone().tz("Europe/Moscow").format();
         console.log(json.data.timelines[0].intervals[0].values);
         const query = `
           INSERT INTO in_tomorrowapidata (temperature, humidity, pressure, windspeed, winddirection,
@@ -109,21 +116,21 @@ function fetchDataTomorroyApi() {
          json.data.timelines[0].intervals[6].values.windSpeed,
           json.data.timelines[0].intervals[6].values.windDirection,
            json.data.timelines[0].intervals[6].values.windGust,
-          json.data.timelines[0].intervals[6].values.precipitationIntensity,
+          json.data.timelines[0].intervals[5].values.precipitationIntensity,
           (json.data.timelines[0].intervals[5].values.precipitationIntensity+json.data.timelines[0].intervals[4].values.precipitationIntensity+json.data.timelines[0].intervals[3].values.precipitationIntensity),
           (json.data.timelines[0].intervals[5].values.precipitationIntensity+json.data.timelines[0].intervals[4].values.precipitationIntensity+json.data.timelines[0].intervals[3].values.precipitationIntensity+json.data.timelines[0].intervals[2].values.precipitationIntensity+json.data.timelines[0].intervals[1].values.precipitationIntensity+json.data.timelines[0].intervals[0].values.precipitationIntensity),
           json.data.timelines[0].intervals[6].values.precipitationProbability,
           json.data.timelines[0].intervals[6].values.precipitationType,
-          json.data.timelines[0].intervals[6].values.rainAccumulation,
+          json.data.timelines[0].intervals[5].values.rainAccumulation,
           (json.data.timelines[0].intervals[5].values.rainAccumulation+json.data.timelines[0].intervals[4].values.rainAccumulation+json.data.timelines[0].intervals[3].values.rainAccumulation),
           (json.data.timelines[0].intervals[5].values.rainAccumulation+json.data.timelines[0].intervals[4].values.rainAccumulation+json.data.timelines[0].intervals[3].values.rainAccumulation+json.data.timelines[0].intervals[2].values.rainAccumulation+json.data.timelines[0].intervals[1].values.rainAccumulation+json.data.timelines[0].intervals[0].values.rainAccumulation),
-          json.data.timelines[0].intervals[6].values.snowAccumulation,
+          json.data.timelines[0].intervals[5].values.snowAccumulation,
           (json.data.timelines[0].intervals[5].values.snowAccumulation+json.data.timelines[0].intervals[4].values.snowAccumulation+json.data.timelines[0].intervals[3].values.snowAccumulation),
           (json.data.timelines[0].intervals[5].values.snowAccumulation+json.data.timelines[0].intervals[4].values.snowAccumulation+json.data.timelines[0].intervals[3].values.snowAccumulation+json.data.timelines[0].intervals[2].values.snowAccumulation+json.data.timelines[0].intervals[1].values.snowAccumulation+json.data.timelines[0].intervals[0].values.snowAccumulation),
-          json.data.timelines[0].intervals[6].values.iceAccumulation,
+          json.data.timelines[0].intervals[5].values.iceAccumulation,
           (json.data.timelines[0].intervals[5].values.iceAccumulation+json.data.timelines[0].intervals[4].values.iceAccumulation+json.data.timelines[0].intervals[3].values.iceAccumulation),
           (json.data.timelines[0].intervals[5].values.iceAccumulation+json.data.timelines[0].intervals[4].values.iceAccumulation+json.data.timelines[0].intervals[3].values.iceAccumulation+json.data.timelines[0].intervals[2].values.iceAccumulation+json.data.timelines[0].intervals[1].values.iceAccumulation+json.data.timelines[0].intervals[0].values.iceAccumulation),
-          now], (err, res) => {
+          currentTime], (err, res) => {
           if (err) {
             console.error(err);
             return;
@@ -137,12 +144,12 @@ function fetchDataTomorroyApi() {
 
 }
 
-function endFuction(linkTomorrow) {
-  fetchDataTomorroyApi(linkTomorrow);
+function endFuction() {
+  fetchDataTomorroyApi();
 }
 
 
-let timerId = setInterval(() => endFuction(osinovaiRosFirsPointTomorrow), 600000);
+let timerId = setInterval(() => endFuction(), 600000);
 
 
 app.listen(PORT, () => {
